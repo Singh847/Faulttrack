@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FaultTrack — Help Desk</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="main-wrap">
+    <div class="topbar" id="topbar"></div>
+    <div class="main-content">
+      <div class="page-title">Online Help Desk</div>
+      <div class="page-sub">Communicate directly with head office</div>
+      <div class="card" style="max-width:700px">
+        <div class="card-header">
+          <span class="card-title">💬 Live Chat</span>
+          <span style="color:var(--green);font-size:12px">● Online</span>
+        </div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-row">
+          <input class="chat-input" id="chat-input" placeholder="Type your message…" onkeydown="if(event.key==='Enter') sendMsg()">
+          <button class="btn btn-primary" onclick="sendMsg()">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth();
+  buildNav('helpdesk');
+  const user = getUser();
+
+  function renderMessages(messages) {
+    const container = document.getElementById('chat-messages');
+    container.innerHTML = messages.map(m => {
+      const isMe = m.sender_id === user.id;
+      const time = m.created_at.slice(11, 16);
+      return `
+        <div class="chat-msg ${isMe ? 'me' : 'them'}">
+          <div class="chat-bubble">${m.text}</div>
+          <div class="chat-meta">${isMe ? 'You' : m.sender_name} · ${time}</div>
+        </div>`;
+    }).join('') || '<div style="text-align:center;color:var(--muted);padding:32px;font-size:13px">No messages yet. Say hello! 👋</div>';
+    container.scrollTop = container.scrollHeight;
+  }
+
+  async function loadMessages() {
+    const messages = await api('GET', '/messages');
+    renderMessages(messages);
+  }
+
+  async function sendMsg() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    try {
+      await api('POST', '/messages', { text });
+      loadMessages();
+    } catch (err) { showToast('❌', err.message); }
+  }
+
+  loadMessages();
+  // Auto-refresh every 5 seconds to see new messages
+  setInterval(loadMessages, 5000);
+</script>
+</body>
+</html>

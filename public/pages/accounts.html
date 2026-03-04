@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FaultTrack — Accounts</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="main-wrap">
+    <div class="topbar" id="topbar"></div>
+    <div class="main-content">
+      <div class="page-title">Engineer Accounts</div>
+      <div class="page-sub">Create and manage engineer profiles</div>
+
+      <div class="toolbar">
+        <input class="search-input" id="acc-search" placeholder="Search engineers…" oninput="renderAccounts()">
+        <button class="btn btn-primary" onclick="openModal('acc-modal')">+ New Account</button>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Username</th><th>Email</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="acc-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New Account Modal -->
+<div class="modal-overlay" id="acc-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">New Engineer Account</div>
+      <button class="modal-close" onclick="closeModal('acc-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">First Name *</label>
+          <input class="form-input" id="a-first" placeholder="First name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name *</label>
+          <input class="form-input" id="a-last" placeholder="Last name">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Username *</label>
+        <input class="form-input" id="a-username" placeholder="Login username">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" id="a-email" placeholder="engineer@company.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password *</label>
+        <input class="form-input" type="password" id="a-password" placeholder="••••••••">
+      </div>
+      <div id="a-error" class="error-text" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('acc-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAccount()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth();
+  requireRole('head-office', 'admin');
+  buildNav('accounts');
+
+  let allUsers = [];
+  api('GET', '/users').then(data => { allUsers = data; renderAccounts(); });
+
+  function renderAccounts() {
+    const q = document.getElementById('acc-search').value.toLowerCase();
+    const filtered = allUsers.filter(u =>
+      !q || `${u.first_name} ${u.last_name}`.toLowerCase().includes(q) || u.username.toLowerCase().includes(q)
+    );
+    document.getElementById('acc-body').innerHTML = filtered.map(u => `
+      <tr>
+        <td style="font-weight:500">${u.first_name} ${u.last_name}</td>
+        <td><code style="font-size:12px;color:var(--muted)">${u.username}</code></td>
+        <td style="color:var(--muted)">${u.email || '—'}</td>
+        <td>${u.active ? '<span class="badge badge-resolved">active</span>' : '<span class="badge badge-open">inactive</span>'}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="toggleUser(${u.id})">
+            ${u.active ? 'Deactivate' : 'Activate'}
+          </button>
+        </td>
+      </tr>`).join('');
+  }
+
+  async function submitAccount() {
+    const errEl = document.getElementById('a-error');
+    errEl.style.display = 'none';
+    const username = document.getElementById('a-username').value.trim();
+    const password = document.getElementById('a-password').value;
+    if (!username || !password) {
+      errEl.textContent = 'Username and password are required.';
+      errEl.style.display = 'block'; return;
+    }
+    try {
+      await api('POST', '/users', {
+        username, password,
+        first_name: document.getElementById('a-first').value,
+        last_name:  document.getElementById('a-last').value,
+        email:      document.getElementById('a-email').value
+      });
+      showToast('✅', `Account created for ${username}`);
+      closeModal('acc-modal');
+      ['a-first','a-last','a-username','a-email','a-password'].forEach(id => document.getElementById(id).value = '');
+      allUsers = await api('GET', '/users');
+      renderAccounts();
+    } catch (err) { errEl.textContent = err.message; errEl.style.display = 'block'; }
+  }
+
+  async function toggleUser(id) {
+    await api('PUT', `/users/${id}/toggle`);
+    allUsers = await api('GET', '/users');
+    renderAccounts();
+    showToast('✅', 'Account status updated');
+  }
+</script>
+</body>
+</html>

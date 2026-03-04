@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FaultTrack — Solutions</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="main-wrap">
+    <div class="topbar" id="topbar"></div>
+    <div class="main-content">
+      <div class="page-title">Solutions Library</div>
+      <div class="page-sub">Search known fixes for common faults</div>
+
+      <div class="toolbar">
+        <input class="search-input" id="sol-search" placeholder="Search by title or fault type…" oninput="renderSolutions()">
+        <button class="btn btn-primary" id="btn-add" onclick="openModal('sol-modal')">+ Add Solution</button>
+      </div>
+      <div id="sol-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Solution Modal -->
+<div class="modal-overlay" id="sol-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add New Solution</div>
+      <button class="modal-close" onclick="closeModal('sol-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Title *</label>
+        <input class="form-input" id="s-title" placeholder="Solution title">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fault / Job Type</label>
+        <input class="form-input" id="s-type" placeholder="e.g. Electrical, HVAC">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description *</label>
+        <textarea class="form-textarea" id="s-desc" style="min-height:120px" placeholder="Step-by-step solution…"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Effectiveness</label>
+        <select class="form-select" id="s-effectiveness">
+          <option>High</option><option>Medium</option><option>Low</option>
+        </select>
+      </div>
+      <div id="s-error" class="error-text" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('sol-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitSolution()">Add Solution</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth();
+  buildNav('solutions');
+
+  const user = getUser();
+  if (user.role === 'engineer') document.getElementById('btn-add').style.display = 'none';
+
+  let allSolutions = [];
+  api('GET', '/solutions').then(data => { allSolutions = data; renderSolutions(); });
+
+  function renderSolutions() {
+    const q = document.getElementById('sol-search').value.toLowerCase();
+    const filtered = allSolutions.filter(s =>
+      !q || s.title.toLowerCase().includes(q) || (s.fault_type||'').toLowerCase().includes(q)
+    );
+    const effColor = { High: 'var(--green)', Medium: 'var(--accent)', Low: 'var(--red)' };
+    document.getElementById('sol-list').innerHTML = filtered.length
+      ? filtered.map(s => `
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <span class="card-title">${s.title}</span>
+                ${s.fault_type ? `<span style="margin-left:10px;font-size:12px;color:var(--muted)">${s.fault_type}</span>` : ''}
+              </div>
+              <span style="font-size:12px;color:${effColor[s.effectiveness]||'var(--muted)'}">● ${s.effectiveness} effectiveness</span>
+            </div>
+            <div class="card-body">
+              <p style="font-size:13px;line-height:1.8;color:var(--muted);white-space:pre-line">${s.description}</p>
+              <div style="margin-top:12px;font-size:11px;color:var(--muted)">Added by ${s.author_name || 'Staff'} · ${s.created_at.slice(0,10)}</div>
+            </div>
+          </div>`).join('')
+      : '<div class="empty"><div class="empty-icon">💡</div>No solutions found</div>';
+  }
+
+  async function submitSolution() {
+    const errEl = document.getElementById('s-error');
+    errEl.style.display = 'none';
+    const title = document.getElementById('s-title').value.trim();
+    const desc  = document.getElementById('s-desc').value.trim();
+    if (!title || !desc) { errEl.textContent = 'Title and description are required.'; errEl.style.display = 'block'; return; }
+    try {
+      await api('POST', '/solutions', {
+        title, description: desc,
+        fault_type:     document.getElementById('s-type').value,
+        effectiveness:  document.getElementById('s-effectiveness').value
+      });
+      showToast('✅', 'Solution added');
+      closeModal('sol-modal');
+      ['s-title','s-type','s-desc'].forEach(id => document.getElementById(id).value = '');
+      allSolutions = await api('GET', '/solutions');
+      renderSolutions();
+    } catch (err) { errEl.textContent = err.message; errEl.style.display = 'block'; }
+  }
+</script>
+</body>
+</html>

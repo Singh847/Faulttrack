@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FaultTrack — Login</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center;
+           min-height: 100vh; background: var(--bg); }
+    .login-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 40px; width: 360px;
+      box-shadow: 0 40px 80px rgba(0,0,0,.5);
+    }
+    .login-logo    { font-family: 'Fraunces', serif; font-size: 28px; color: var(--accent); margin-bottom: 4px; }
+    .login-tagline { color: var(--muted); font-size: 12px; margin-bottom: 28px; }
+    .hint          { color: var(--muted); font-size: 11px; margin-top: 16px; text-align: center; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="login-logo">FaultTrack</div>
+    <div class="login-tagline">ENGINEERING FAULT MANAGEMENT SYSTEM</div>
+
+    <div class="form-group">
+      <label class="form-label">Username</label>
+      <input class="form-input" id="username" type="text" placeholder="Enter your username">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input class="form-input" id="password" type="password" placeholder="••••••••">
+    </div>
+
+    <div id="error" class="error-text" style="display:none;margin-bottom:12px"></div>
+
+    <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Sign In →</button>
+
+    <div class="hint">
+      <strong>Demo accounts</strong> (password: <code>password</code>)<br>
+      engineer1 &nbsp;|&nbsp; headoffice1 &nbsp;|&nbsp; admin1
+    </div>
+  </div>
+
+  <script>
+    // Redirect if already logged in
+    if (localStorage.getItem('ft_token')) window.location.href = '/pages/dashboard.html';
+
+    async function doLogin() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const errorEl  = document.getElementById('error');
+      errorEl.style.display = 'none';
+
+      if (!username || !password) {
+        errorEl.textContent = 'Please enter both username and password.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      try {
+        const res  = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        localStorage.setItem('ft_token', data.token);
+        localStorage.setItem('ft_user',  JSON.stringify(data.user));
+        window.location.href = '/pages/dashboard.html';
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.style.display = 'block';
+      }
+    }
+
+    // Allow pressing Enter to log in
+    document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  </script>
+</body>
+</html>

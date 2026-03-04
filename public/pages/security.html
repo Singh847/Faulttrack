@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FaultTrack — Security</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="main-wrap">
+    <div class="topbar" id="topbar"></div>
+    <div class="main-content">
+      <div class="page-title">Security Settings</div>
+      <div class="page-sub">Manage system access policies</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+
+        <div class="card">
+          <div class="card-header"><span class="card-title">🔐 Authentication Policy</span></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Max Login Attempts</label>
+              <input class="form-input" type="number" value="5" min="1" max="10">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Session Timeout (minutes)</label>
+              <input class="form-input" type="number" value="480">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Minimum Password Length</label>
+              <input class="form-input" type="number" value="8">
+            </div>
+            <button class="btn btn-primary" onclick="showToast('✅','Policy saved')">Save Policy</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><span class="card-title">📋 Role Permissions</span></div>
+          <table>
+            <thead><tr><th>Feature</th><th>Engineer</th><th>Head Office</th><th>Admin</th></tr></thead>
+            <tbody>
+              <tr><td>View Faults</td><td>✅</td><td>✅</td><td>✅</td></tr>
+              <tr><td>Log Faults</td><td>✅</td><td>—</td><td>✅</td></tr>
+              <tr><td>Update Status</td><td>✅</td><td>✅</td><td>✅</td></tr>
+              <tr><td>Add Solutions</td><td>—</td><td>✅</td><td>✅</td></tr>
+              <tr><td>Manage Accounts</td><td>—</td><td>✅</td><td>✅</td></tr>
+              <tr><td>Security Settings</td><td>—</td><td>—</td><td>✅</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth();
+  requireRole('admin');
+  buildNav('security');
+</script>
+</body>
+</html>

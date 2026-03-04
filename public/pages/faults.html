@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FaultTrack — Fault Logs</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="main-wrap">
+    <div class="topbar" id="topbar"></div>
+    <div class="main-content">
+      <div class="page-title">Fault Logs</div>
+      <div class="page-sub">Track and manage all engineering faults</div>
+
+      <div class="toolbar">
+        <input class="search-input" id="search" placeholder="Search faults…" oninput="renderTable()">
+        <select class="form-select" id="filter-status" onchange="renderTable()" style="width:160px">
+          <option value="">All Statuses</option>
+          <option value="open">Open</option>
+          <option value="in-progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+        </select>
+        <button class="btn btn-primary" id="btn-log" onclick="openModal('fault-modal')">+ Log Fault</button>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Description</th><th>Job</th><th>Priority</th><th>Status</th><th>Engineer</th><th>Date</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="fault-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Log Fault Modal -->
+<div class="modal-overlay" id="fault-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Log New Fault</div>
+      <button class="modal-close" onclick="closeModal('fault-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Description *</label>
+        <input class="form-input" id="f-desc" placeholder="Describe the fault clearly">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Job Type</label>
+          <input class="form-input" id="f-job" placeholder="e.g. Electrical, HVAC">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Priority</label>
+          <select class="form-select" id="f-priority">
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium" selected>Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Location</label>
+        <input class="form-input" id="f-location" placeholder="Where is the fault?">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="f-notes" placeholder="Any additional details…"></textarea>
+      </div>
+      <div id="f-error" class="error-text" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('fault-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitFault()">Submit Fault</button>
+    </div>
+  </div>
+</div>
+
+<!-- Update Status Modal -->
+<div class="modal-overlay" id="update-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="update-title">Update Fault</div>
+      <button class="modal-close" onclick="closeModal('update-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="update-desc" style="background:var(--bg);padding:12px;border-radius:6px;margin-bottom:16px;font-size:13px;color:var(--muted)"></div>
+      <div class="form-group">
+        <label class="form-label">New Status</label>
+        <select class="form-select" id="u-status">
+          <option value="open">Open</option>
+          <option value="in-progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Update Notes</label>
+        <textarea class="form-textarea" id="u-notes" placeholder="What was done?"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('update-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUpdate()">Save Update</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth();
+  buildNav('faults');
+
+  const user = getUser();
+  const canLog = user.role === 'engineer' || user.role === 'admin';
+  if (!canLog) document.getElementById('btn-log').style.display = 'none';
+
+  let allFaults  = [];
+  let updatingId = null;
+
+  api('GET', '/faults').then(data => { allFaults = data; renderTable(); });
+
+  function renderTable() {
+    const q   = document.getElementById('search').value.toLowerCase();
+    const st  = document.getElementById('filter-status').value;
+    const filtered = allFaults.filter(f =>
+      (!q  || f.description.toLowerCase().includes(q) || f.fault_code.toLowerCase().includes(q) || (f.job_type||'').toLowerCase().includes(q)) &&
+      (!st || f.status === st)
+    );
+
+    document.getElementById('fault-body').innerHTML = filtered.length
+      ? filtered.map(f => `
+          <tr>
+            <td><code style="color:var(--blue);font-size:12px">${f.fault_code}</code></td>
+            <td>${f.description}</td>
+            <td style="color:var(--muted)">${f.job_type || '—'}</td>
+            <td>${badge(f.priority)}</td>
+            <td>${badge(f.status)}</td>
+            <td>${f.engineer_name || '—'}</td>
+            <td style="color:var(--muted);font-size:12px">${f.created_at.slice(0,10)}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm" onclick="openUpdate(${f.id})">Update</button>
+            </td>
+          </tr>`).join('')
+      : '<tr><td colspan="8"><div class="empty"><div class="empty-icon">⚡</div>No faults found</div></td></tr>';
+  }
+
+  async function submitFault() {
+    const desc = document.getElementById('f-desc').value.trim();
+    const errEl = document.getElementById('f-error');
+    errEl.style.display = 'none';
+    if (!desc) { errEl.textContent = 'Description is required.'; errEl.style.display = 'block'; return; }
+    try {
+      const res = await api('POST', '/faults', {
+        description: desc,
+        job_type:    document.getElementById('f-job').value,
+        priority:    document.getElementById('f-priority').value,
+        location:    document.getElementById('f-location').value,
+        notes:       document.getElementById('f-notes').value
+      });
+      showToast('✅', `Fault ${res.fault_code} logged`);
+      closeModal('fault-modal');
+      ['f-desc','f-job','f-location','f-notes'].forEach(id => document.getElementById(id).value = '');
+      allFaults = await api('GET', '/faults');
+      renderTable();
+    } catch (err) { errEl.textContent = err.message; errEl.style.display = 'block'; }
+  }
+
+  function openUpdate(id) {
+    updatingId = id;
+    const f = allFaults.find(x => x.id === id);
+    document.getElementById('update-title').textContent = `Update — ${f.fault_code}`;
+    document.getElementById('update-desc').textContent  = f.description;
+    document.getElementById('u-status').value  = f.status;
+    document.getElementById('u-notes').value   = f.notes || '';
+    openModal('update-modal');
+  }
+
+  async function saveUpdate() {
+    try {
+      await api('PUT', `/faults/${updatingId}`, {
+        status: document.getElementById('u-status').value,
+        notes:  document.getElementById('u-notes').value
+      });
+      showToast('✅', 'Fault updated');
+      closeModal('update-modal');
+      allFaults = await api('GET', '/faults');
+      renderTable();
+    } catch (err) { showToast('❌', err.message); }
+  }
+</script>
+</body>
+</html>

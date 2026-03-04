@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FaultTrack — Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="main-wrap">
+    <div class="topbar" id="topbar"></div>
+    <div class="main-content">
+      <div class="page-title">Dashboard</div>
+      <div class="page-sub" id="welcome-msg"></div>
+
+      <div class="stats-grid">
+        <div class="stat-card" style="border-top:3px solid var(--blue)">
+          <div class="stat-value" id="stat-total">—</div>
+          <div class="stat-label">Total Faults</div>
+        </div>
+        <div class="stat-card" style="border-top:3px solid var(--red)">
+          <div class="stat-value" id="stat-open">—</div>
+          <div class="stat-label">Open</div>
+        </div>
+        <div class="stat-card" style="border-top:3px solid var(--accent)">
+          <div class="stat-value" id="stat-progress">—</div>
+          <div class="stat-label">In Progress</div>
+        </div>
+        <div class="stat-card" style="border-top:3px solid var(--green)">
+          <div class="stat-value" id="stat-resolved">—</div>
+          <div class="stat-label">Resolved</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Recent Faults</span>
+          <a href="/pages/faults.html" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Description</th><th>Priority</th><th>Status</th><th>Engineer</th></tr>
+          </thead>
+          <tbody id="recent-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth();
+  buildNav('dashboard');
+  document.getElementById('welcome-msg').textContent = `Welcome back, ${getUser().name}.`;
+
+  api('GET', '/faults').then(faults => {
+    document.getElementById('stat-total').textContent    = faults.length;
+    document.getElementById('stat-open').textContent     = faults.filter(f => f.status === 'open').length;
+    document.getElementById('stat-progress').textContent = faults.filter(f => f.status === 'in-progress').length;
+    document.getElementById('stat-resolved').textContent = faults.filter(f => f.status === 'resolved').length;
+
+    document.getElementById('recent-body').innerHTML = faults.slice(0, 5).map(f => `
+      <tr>
+        <td><code style="color:var(--blue);font-size:12px">${f.fault_code}</code></td>
+        <td>${f.description}</td>
+        <td>${badge(f.priority)}</td>
+        <td>${badge(f.status)}</td>
+        <td>${f.engineer_name || '—'}</td>
+      </tr>
+    `).join('');
+  });
+</script>
+</body>
+</html>
