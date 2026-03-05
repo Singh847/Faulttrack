@@ -3,9 +3,13 @@ const cors    = require('cors');
 const jwt     = require('jsonwebtoken');
 const bcrypt  = require('bcryptjs');
 const path    = require('path');
+const http    = require('http');
+const { Server } = require('socket.io');
 const { initDb, prepare } = require('./db');
 
 const app    = express();
+const server = http.createServer(app);
+const io     = new Server(server, { cors: { origin: '*' } });
 const SECRET = 'faulttrack_secret';
 
 app.use(cors());
@@ -150,8 +154,29 @@ app.post('/api/messages', auth, (req, res) => {
     .run(req.user.id, req.user.name, req.user.role, text);
   res.json({ success: true });
 });
+// ── SOCKET.IO REAL-TIME CHAT ──────────────────────
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
 
+  // Send existing messages when user joins
+  socket.on('join', () => {
+    const messages = prepare('SELECT * FROM messages ORDER BY created_at ASC').all();
+    socket.emit('history', messages);
+  });
+
+  // Receive and broadcast new message
+  socket.on('message', (data) => {
+    prepare('INSERT INTO messages (sender_id, sender_name, sender_role, text) VALUES (?, ?, ?, ?)')
+      .run(data.sender_id, data.sender_name, data.sender_role, data.text);
+    const messages = prepare('SELECT * FROM messages ORDER BY created_at ASC').all();
+    io.emit('history', messages);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
 // ── START ─────────────────────────────────────────
 initDb().then(() => {
-  app.listen(3000, () => console.log('✅ FaultTrack running at http://localhost:3000'));
+  server.listen(3000, () => console.log('✅ FaultTrack running at http://localhost:3000'));
 });
