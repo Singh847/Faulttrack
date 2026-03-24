@@ -179,4 +179,3 @@ io.on('connection', (socket) => {
 // ── START ─────────────────────────────────────────
 initDb().then(() => {
   server.listen(3000, () => console.log('✅ FaultTrack running at http://localhost:3000'));
-});
